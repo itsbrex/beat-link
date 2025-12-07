@@ -175,6 +175,32 @@ public class DeviceFinder extends LifecycleParticipant {
     }
 
     /**
+     * Checks whether the supplied address is an IPV6 address that represents a wrapped IPV4 address. If so,
+     * returns the IPV4 version of the address.
+     *
+     * @param address an address to potentially unwrap
+     *
+     * @return either the original address, or the IPV4 equivalent, if one exists.
+     */
+    public InetAddress unwrapV6mappedV4address(InetAddress address) {
+        if (address instanceof Inet6Address) {
+            Inet6Address wrapper = (Inet6Address) address;
+            try {
+                if (wrapper.isIPv4CompatibleAddress()) {
+                    byte[] addressBytes = wrapper.getAddress();
+                    // Extract the last 4 bytes, which hold the wrapped IPv4 address.
+                    byte[] v4bytes = new byte[4];
+                    System.arraycopy(addressBytes, addressBytes.length - 4, v4bytes, 0, 4);
+                    return InetAddress.getByAddress(v4bytes);
+                }
+             } catch (UnknownHostException e) {
+                logger.warn("Problem trying to unwrap potential IPV4 address from IPV6 address", e);
+            }
+        }
+        return address;
+    }
+
+    /**
      * Check whether an address is being ignored. (The {@link BeatFinder} will call this, so it can filter out the
      * {@link VirtualCdj}'s beat messages when it is broadcasting them, for example).
      *
@@ -184,7 +210,7 @@ public class DeviceFinder extends LifecycleParticipant {
      */
     @API(status = API.Status.STABLE)
     public boolean isAddressIgnored(InetAddress address) {
-        return ignoredAddresses.contains(address);
+        return ignoredAddresses.contains(unwrapV6mappedV4address(address));
     }
 
     /**
